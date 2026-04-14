@@ -1,0 +1,558 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Total conversations, AI replies, human handoffs, and resolved counts",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Human Handoffs" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT conversation_id) AS \"Total Conversations\" FROM chat_events WHERE $__timeFilter(timestamp) AND inbox IN ($inbox)",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"AI Replies\" FROM chat_events WHERE $__timeFilter(timestamp) AND event_type = 'ai_reply_sent' AND inbox IN ($inbox)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Human Handoffs\" FROM chat_events WHERE $__timeFilter(timestamp) AND event_type = 'human_handoff' AND inbox IN ($inbox)",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Resolved\" FROM chat_events WHERE $__timeFilter(timestamp) AND event_type = 'conversation_resolved' AND inbox IN ($inbox)",
+          "refId": "D"
+        }
+      ],
+      "title": "Conversation Overview",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Average and p95 latency over time by hour",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisLabel": "ms",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 2000 }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_trunc('hour', timestamp) AS time,\n  AVG(latency_ms)::int AS \"Avg Latency (ms)\",\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms)::int AS \"P95 Latency (ms)\"\nFROM ai_requests\nWHERE $__timeFilter(timestamp)\n  AND latency_ms IS NOT NULL\n  AND provider IN ($provider)\n  AND model IN ($model)\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Response Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Total runs, success rate, and failure rate",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Failure Rate %" },
+            "properties": [
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 20 }] } },
+              { "id": "color", "value": { "mode": "thresholds" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Success Rate %" },
+            "properties": [
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 90 }] } },
+              { "id": "color", "value": { "mode": "thresholds" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Total Runs\" FROM workflow_runs WHERE $__timeFilter(timestamp) AND workflow_name IN ($workflow_name)",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS \"Success Rate %\" FROM workflow_runs WHERE $__timeFilter(timestamp) AND workflow_name IN ($workflow_name)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS \"Failure Rate %\" FROM workflow_runs WHERE $__timeFilter(timestamp) AND workflow_name IN ($workflow_name)",
+          "refId": "C"
+        }
+      ],
+      "title": "Workflow Health",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 101,
+      "title": "Analysis",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Daily estimated cost by model",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisLabel": "Cost ($)",
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_trunc('day', timestamp) AS time,\n  model,\n  SUM(estimated_cost)::numeric(10,4) AS \"Cost ($)\"\nFROM ai_requests\nWHERE $__timeFilter(timestamp)\n  AND estimated_cost IS NOT NULL\n  AND provider IN ($provider)\n  AND model IN ($model)\nGROUP BY 1, 2\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Token & Cost Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Daily escalation and fallback counts from AI requests",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Escalations" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Fallbacks" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_trunc('day', timestamp) AS time,\n  SUM(CASE WHEN escalated = true THEN 1 ELSE 0 END) AS \"Escalations\",\n  SUM(CASE WHEN fallback_used = true THEN 1 ELSE 0 END) AS \"Fallbacks\"\nFROM ai_requests\nWHERE $__timeFilter(timestamp)\n  AND provider IN ($provider)\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Escalation & Fallback Trends",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Schema pass rate and error trends",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "id": 6,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN schema_valid = true THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(schema_valid), 0) * 100, 1) AS \"Schema Pass Rate %\" FROM ai_requests WHERE $__timeFilter(timestamp) AND provider IN ($provider)",
+          "refId": "A"
+        }
+      ],
+      "title": "Schema Validation Quality",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 102,
+      "title": "Operations",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Recent failures, escalations, and handoffs across all systems",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "source" },
+            "properties": [
+              { "id": "custom.width", "value": 80 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "options": { "ai": { "color": "blue", "index": 0, "text": "AI" }, "chat": { "color": "purple", "index": 2, "text": "Chat" }, "workflow": { "color": "orange", "index": 1, "text": "Workflow" } }, "type": "value" }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "timestamp" },
+            "properties": [{ "id": "custom.width", "value": 180 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "duration/latency" },
+            "properties": [{ "id": "unit", "value": "ms" }, { "id": "custom.width", "value": 120 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 16 },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "timestamp" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp, 'ai' AS source, conversation_id AS identifier,\n       provider || '/' || model AS detail,\n       COALESCE(error_type, CASE WHEN escalated THEN 'escalated' WHEN fallback_used THEN 'fallback' END) AS status,\n       latency_ms AS \"duration/latency\"\nFROM ai_requests\nWHERE $__timeFilter(timestamp)\n  AND (error_type IS NOT NULL OR fallback_used = true OR escalated = true)\n\nUNION ALL\n\nSELECT timestamp, 'workflow', execution_id,\n       workflow_name, status, duration_ms\nFROM workflow_runs\nWHERE $__timeFilter(timestamp)\n  AND status != 'success'\n\nUNION ALL\n\nSELECT timestamp, 'chat', conversation_id,\n       event_type, agent_type, NULL::int\nFROM chat_events\nWHERE $__timeFilter(timestamp)\n  AND event_type = 'human_handoff'\n\nORDER BY timestamp DESC\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Incidents",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Top 5 slowest workflows by average duration",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 3000 }, { "color": "red", "value": 6000 }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Avg Duration (ms)" },
+            "properties": [{ "id": "unit", "value": "ms" }, { "id": "custom.cellOptions", "value": { "mode": "basic", "type": "color-background" } }, { "id": "color", "value": { "mode": "thresholds" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 5, "x": 14, "y": 16 },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  workflow_name AS \"Workflow\",\n  ROUND(AVG(duration_ms)) AS \"Avg Duration (ms)\",\n  COUNT(*) AS \"Runs\"\nFROM workflow_runs\nWHERE $__timeFilter(timestamp)\nGROUP BY workflow_name\nORDER BY AVG(duration_ms) DESC\nLIMIT 5",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 Slowest Workflows",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+      "description": "Top 5 most expensive models by total cost",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Total Cost ($)" },
+            "properties": [{ "id": "unit", "value": "currencyUSD" }, { "id": "custom.cellOptions", "value": { "mode": "gradient-gauge", "type": "gauge" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 5, "x": 19, "y": 16 },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  provider || '/' || model AS \"Model\",\n  ROUND(SUM(estimated_cost)::numeric, 4) AS \"Total Cost ($)\",\n  SUM(total_tokens) AS \"Total Tokens\"\nFROM ai_requests\nWHERE $__timeFilter(timestamp)\n  AND estimated_cost IS NOT NULL\nGROUP BY provider, model\nORDER BY SUM(estimated_cost) DESC\nLIMIT 5",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 Most Expensive Models",
+      "type": "table"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["ai-operations", "monitoring"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+        "definition": "SELECT DISTINCT provider FROM ai_requests ORDER BY provider",
+        "includeAll": true,
+        "multi": true,
+        "name": "provider",
+        "query": "SELECT DISTINCT provider FROM ai_requests ORDER BY provider",
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+        "definition": "SELECT DISTINCT model FROM ai_requests WHERE provider IN ($provider) ORDER BY model",
+        "includeAll": true,
+        "multi": true,
+        "name": "model",
+        "query": "SELECT DISTINCT model FROM ai_requests WHERE provider IN ($provider) ORDER BY model",
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+        "definition": "SELECT DISTINCT workflow_name FROM workflow_runs ORDER BY workflow_name",
+        "includeAll": true,
+        "multi": true,
+        "name": "workflow_name",
+        "query": "SELECT DISTINCT workflow_name FROM workflow_runs ORDER BY workflow_name",
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+        "definition": "SELECT DISTINCT inbox FROM chat_events WHERE inbox IS NOT NULL ORDER BY inbox",
+        "includeAll": true,
+        "multi": true,
+        "name": "inbox",
+        "query": "SELECT DISTINCT inbox FROM chat_events WHERE inbox IS NOT NULL ORDER BY inbox",
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ai-ops-postgres" },
+        "definition": "SELECT DISTINCT status FROM workflow_runs ORDER BY status",
+        "includeAll": true,
+        "multi": true,
+        "name": "status",
+        "query": "SELECT DISTINCT status FROM workflow_runs ORDER BY status",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI Operations Monitoring Dashboard",
+  "uid": "ai-ops-main",
+  "version": 1
+}
