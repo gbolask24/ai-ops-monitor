@@ -1,18 +1,18 @@
 # AI Operations Monitoring Dashboard
 
-A lightweight observability layer for AI-assisted customer operations, monitoring Chatwoot activity, AI chatbot performance, and n8n workflow execution through structured telemetry flowing into Grafana.
+A lightweight observability layer for AI operations, monitoring chat activity, AI service performance, and workflow execution through structured telemetry flowing into Grafana.
 
-This project demonstrates how AI-assisted customer operations can be monitored in real-time, providing visibility into latency, cost, workflow reliability, and escalation behaviour.
+This project demonstrates how AI operations can be monitored in real-time, providing visibility into latency, cost, workflow reliability, and escalation behaviour.
 
 ## Architecture
 
 ```
-Chatwoot webhooks ─────┐
-n8n HTTP nodes ────────┤──→ FastAPI webhook receiver ──→ Postgres ──→ Grafana
-AI service telemetry ──┘         (port 8001)            (port 5432)    (port 3000)
+Chat platform webhooks ──┐
+Workflow engine events ──┤──→ FastAPI webhook receiver ──→ Postgres ──→ Grafana
+AI service telemetry ────┘         (port 8001)            (port 5432)    (port 3000)
 ```
 
-**Ingestion:** Chatwoot webhooks, n8n HTTP nodes, and AI service telemetry flow into a lightweight FastAPI webhook receiver. Python ingestion and seed scripts support local testing and demo data generation.
+**Ingestion:** Chat platform webhooks, workflow engine events, and AI service telemetry flow into a lightweight FastAPI webhook receiver. Python ingestion and seed scripts support local testing and demo data generation.
 
 **Storage:** Postgres acts as the central metrics store across three core tables: `chat_events`, `workflow_runs`, and `ai_requests`.
 
@@ -28,7 +28,7 @@ AI service telemetry ──┘         (port 8001)            (port 5432)    (po
 
 ## Features
 
-- **Conversation monitoring** — track volume, AI replies, human handoffs, resolution rates
+- **Conversation monitoring** — track volume, AI replies, agent handoffs, resolution rates
 - **AI latency and cost tracking** — avg/p95 latency, token usage, estimated cost by model
 - **Workflow health** — success/failure rates, top failing workflows, duration analysis
 - **Escalation visibility** — escalation and fallback trends over time
@@ -71,9 +71,9 @@ The main dashboard contains 8 panels across 3 rows:
 ### Overview Row
 | Panel | What it answers |
 |---|---|
-| **Conversation Overview** | How many conversations are we handling? How many go to AI vs humans? |
+| **Conversation Overview** | How many conversations are we handling? How many go to AI vs human agents? |
 | **AI Response Latency** | What's our avg and p95 latency? Any degradation trends? |
-| **Workflow Health** | Are our n8n workflows running reliably? Which ones fail most? |
+| **Workflow Health** | Are our workflows running reliably? Which ones fail most? |
 
 ### Analysis Row
 | Panel | What it answers |
@@ -92,11 +92,11 @@ Dashboard variables (provider, model, workflow, inbox, status) allow filtering a
 
 ## Connecting Real Systems
 
-The webhook receiver accepts generic JSON payloads, making it compatible with Chatwoot webhooks, n8n HTTP nodes, or direct AI service telemetry without requiring strict schemas.
+The webhook receiver accepts generic JSON payloads, making it compatible with chat platform webhooks, workflow engine callbacks, or direct AI service telemetry without requiring strict schemas.
 
-### Chatwoot
+### Chat Platform
 
-Configure a webhook in Chatwoot pointing at:
+Configure a webhook in your chat platform pointing at:
 
 ```
 http://<host>:8001/ingest/chat-event
@@ -113,9 +113,9 @@ Payload example:
 }
 ```
 
-### n8n
+### Workflow Engine
 
-Add an HTTP Request node at the end of workflows:
+Add an HTTP request step at the end of workflows:
 
 ```
 POST http://<host>:8001/ingest/workflow-run
@@ -153,9 +153,9 @@ Any fields not matching known columns are stored in the JSONB `metadata` column.
 
 | Table | Purpose | Key fields |
 |---|---|---|
-| `chat_events` | Chatwoot conversation activity | `conversation_id`, `event_type`, `agent_type`, `inbox` |
-| `workflow_runs` | n8n workflow execution | `workflow_name`, `execution_id`, `status`, `duration_ms` |
-| `ai_requests` | LLM/chatbot metrics | `provider`, `model`, `latency_ms`, `estimated_cost`, `schema_valid` |
+| `chat_events` | Conversation activity from chat platforms | `conversation_id`, `event_type`, `agent_type`, `inbox` |
+| `workflow_runs` | Workflow execution telemetry | `workflow_name`, `execution_id`, `status`, `duration_ms` |
+| `ai_requests` | LLM / AI service metrics | `provider`, `model`, `latency_ms`, `estimated_cost`, `schema_valid` |
 
 Full schema: [`db/init.sql`](db/init.sql)
 
